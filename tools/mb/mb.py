@@ -18,7 +18,10 @@ import ast
 import errno
 import json
 import os
-import pipes
+try:
+    import pipes  # type: ignore
+except Exception:  # pragma: no cover
+    pipes = None
 import platform
 import pprint
 import re
@@ -1166,8 +1169,20 @@ class MetaBuildWrapper(object):
       shell_quoter = QuoteForCmd
     else:
       env_prefix = ''
-      env_quoter = pipes.quote
-      shell_quoter = pipes.quote
+      try:
+        from shlex import quote as shlex_quote
+      except Exception:
+        shlex_quote = None
+      if pipes is not None and hasattr(pipes, 'quote'):
+        env_quoter = pipes.quote
+        shell_quoter = pipes.quote
+      elif shlex_quote is not None:
+        env_quoter = shlex_quote
+        shell_quoter = shlex_quote
+      else:
+        # Fallback no-op quote to avoid crashes; safer than failing outright
+        env_quoter = lambda s: s
+        shell_quoter = lambda s: s
 
     def print_env(var):
       if env and var in env:
